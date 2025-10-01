@@ -1,0 +1,6 @@
+authzed:
+  api: "${AUTHZED_API}"
+  key: "${API_KEY}"
+workload:
+  read_ratio: 100             # 💡 For every write, do ~100 reads i.e. number of reads per write
+  duration_sec: 10            # 💡 Run for 60 seconds, set to 0 to run indefinitely

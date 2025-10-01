@@ -1,0 +1,142 @@
+= AuthZed + CockroachDB Workload Simulator
+:linkattrs:
+:project-owner: amineelkouhen
+:project-name:  crdb-authzed-load-test
+:project-group: com.cockroachlabs
+:project-version:   1.0.0
+:site-url:  https://github.com/amineelkouhen/crdb-authzed-load-test
+
+image:https://img.shields.io/github/contributors/{project-owner}/{project-name}[GitHub contributors]
+image:https://img.shields.io/github/forks/{project-owner}/{project-name}[Fork]
+image:https://img.shields.io/github/stars/{project-owner}/{project-name}[GitHub Repo stars]
+image:https://img.shields.io/github/watchers/{project-owner}/{project-name}[GitHub watchers]
+image:https://img.shields.io/github/issues/{project-owner}/{project-name}[GitHub issues]
+image:https://img.shields.io/github/license/{project-owner}/{project-name}[License]
+
+image::images/banner.png[banner]
+---
+
+A workload simulator and benchmarking tool for evaluating https://authzed.com/[AuthZed] with https://www.cockroachlabs.com/[CockroachDB]. AuthZed acts as a centralized service that stores authorization data (relationships, and permissions).
+Developers create a schema that models their permissions requirements, use a client library to apply the schema to the database, and insert data into the database through REST or gRPC APIs.
+Once stored, data can be queried to check permissions in your applications. You can answer questions such as “Does this user have access to this resource?” and “What are all the resources this user has access to?”
+
+image::https://github.com/amineelkouhen/crdb-authzed-sandbox/raw/main/images/authzed.png[spicedb-CRDB]
+
+You can also use the https://github.com/amineelkouhen/crdb-authzed-sandbox[CockroachDB + AuthZed Sandbox] to provision the joint environment, and execute this tool.
+
+This project simulate multiple workloads for AuthZed. It simulates permission tuple insertions and checks at scale.
+
+== 🚀 Quickstart Guide
+
+=== 🛠️ 1. Configure Your Workload
+
+Edit `config/config.yaml` to point to your AuthZed endpoints and define the test parameters like `read_ratio` and `duration_sec`.
+
+[source,yaml]
+----
+authzed:
+  api: "http://34.218.168.56:8443"
+  key: "somerandomkeyhere"
+workload:
+  read_ratio: 100             # 💡 For every write, do ~100 reads i.e. number of reads per write
+  duration_sec: 120            # 💡 Run for 120 seconds, set to 0 to run indefinitely
+----
+
+'''
+
+=== ⚙️ 2. Build the Simulator
+
+Run the following to compile the binary:
+
+[source,bash]
+----
+make clean build
+----
+
+'''
+
+=== ▶️️ 3. Create the Permission Schema
+
+For this workload simulator you should have the following pre-defined schema:
+Define the `user` and `document` concepts. The user can be a `viewer`, an `editor` or `admin`.
+The definition gives the `remove` permission to the `admin` role only. To `edit` a file you must be either an `editor` or `admin`. The permission to `view` a document is set for viewer, editor and admin roles.
+
+image::https://github.com/amineelkouhen/crdb-authzed-sandbox/raw/main/images/graph.png[spicedb]
+
+To write the schema above, you can use the following API call:
+
+[source,bash]
+----
+curl --location 'http://<client_IP>:8443/v1/schema/write' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: Bearer <preshared_key>' \
+--data '{
+    "schema": "definition user {} \n definition document { \n relation editor: user \n relation viewer: user \n relation admin: user \n permission view = viewer + editor + admin \n permission edit = editor + admin \n permission remove = admin \n}"
+}'
+
+# output:
+# {"writtenAt":{"token":"GhUKEzE3NTgxMjkyOTM0MDE2MDYxNDA="}}
+----
+
+=== ▶️️ 3. Run the Simulator
+After creating the schema that models your resources and the required permissions, you can run the simulator to apply and check permissions through the API:
+
+[source,bash]
+----
+./crdb-authzed-load-test \
+  --duration-sec=60 \
+  --read-ratio=100 \
+  --workload-config=config/config.yaml \
+  --log-file=run.log
+----
+
+Happy benchmarking! 🧪📈
+
+==== 📊 What Does `read_ratio Do?
+
+This option controls *how many reads per write*:
+
+[source,yaml]
+----
+read_ratio: 100
+----
+
+`read_ratio controls how many reads are triggered per write. In the example above, for every 1 write, the workload will perform approximately 100 read operations.
+
+This simulates *real-world workloads*, where reads vastly outnumber writes.
+
+Results include detailed breakdowns:
+
+----
+🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧
+✅  AuthZed Load generation and identity checks complete
+⏱️  Duration:                 1m0s
+⚙️  Concurrency:              101
+🚦  Checks/sec:               114.8
+🧪  Mode:                     LIVE
+✔️  Allowed:                  4447
+🚫 Denied:                    2447
+✏️  Writes:                   70
+👁️  Reads:                    6898
+📊  Read/Write ratio:         98.5:1
+🚨  Failed writes to AuthZed: 0
+🚨  Failed reads to AuthZed:  0
+🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧
+----
+
+'''
+
+== ❓ Why Use This Instead of Writing Directly to CockroachDB?
+
+This tool is not a raw CockroachDB benchmark. Instead, it emulates full _application-level_ behavior by using official AuthZed APIs.
+
+This approach:
+
+✅ Tests end-to-end query paths
+
+✅ Evaluates AuthZed's caching, indexing, and internal logic
+
+✅ Produces realistic and reliable benchmarks
+
+🚫 Avoids misleading results from skipping business logic or API-layer checks
