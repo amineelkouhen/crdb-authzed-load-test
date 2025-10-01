@@ -55,7 +55,7 @@ make clean build
 
 '''
 
-=== ▶️️ 3. Create the Permission Schema
+=== 📜️ 3. Create the Relationships/Permissions Schema
 
 For this workload simulator you should have the following pre-defined schema:
 Define the `user` and `document` concepts. The user can be a `viewer`, an `editor` or `admin`.
@@ -79,7 +79,7 @@ curl --location 'http://<client_IP>:8443/v1/schema/write' \
 # {"writtenAt":{"token":"GhUKEzE3NTgxMjkyOTM0MDE2MDYxNDA="}}
 ----
 
-=== ▶️️ 3. Run the Simulator
+=== ▶️️ 4. Run the Simulator
 After creating the schema that models your resources and the required permissions, you can run the simulator to apply and check permissions through the API:
 
 [source,bash]
